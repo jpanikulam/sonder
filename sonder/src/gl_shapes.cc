@@ -10,12 +10,17 @@ void draw_coordinate_system() {
   draw_coordinate_system(Eigen::Vector3f::Zero(), Eigen::Matrix3f::Identity());
 }
 
+void draw_coordinate_system(const se3 &pose){
+  // const auto pose_inv = pose.inverse();
+  draw_coordinate_system(pose.translation(), pose.rotationMatrix());
+}
+
 void draw_coordinate_system(const Eigen::Vector3f &position, const Eigen::Matrix3f &orientation) {
   glPushMatrix();
 
   const Eigen::Quaternionf q(orientation);
-  glRotate(q);
   glTranslate(position);
+  glRotate(q);
 
   constexpr float narrow_scale = 0.05;
   constexpr float wide_scale   = 0.5;
@@ -217,11 +222,12 @@ void draw_sonar_view(const se3 &pose, const float max_bearing, const float max_e
 
   const Eigen::Vector3f symmetric_point(x_sym, y_sym, z_sym);
 
-  draw_coordinate_system(pose.translation(), pose.rotationMatrix());
+  // draw_coordinate_system(pose.translation(), pose.rotationMatrix());
+  draw_coordinate_system(pose);
 
   glPushMatrix();
-  glRotate(pose.unit_quaternion());
   glTranslate(pose.translation());
+  glRotate(pose.unit_quaternion());
   glBegin(GL_LINE_STRIP);
   {
     glVertex3f(0.0, 0.0, 0.0);

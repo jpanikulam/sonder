@@ -50,16 +50,12 @@ struct State {
 
   float           view_velocity_decay = 0.9f;
   Eigen::Vector3f view_velocity       = Eigen::Vector3f::Zero();
-  Eigen::Vector3f view_position       = Eigen::Vector3f(0.0f, 0.0f, -4.0f);
 
   // Camera orientation management
   float           view_rotation_decay   = 0.9f;
   Eigen::Vector3f view_angular_velocity = Eigen::Vector3f::Zero();
-  se3 view_pose = se3(Eigen::Matrix3f::Identity(), Eigen::Vector3f::Zero());
-  // Eigen::Matrix3f view_orientation      = Eigen::Matrix3f::Identity();
-
-  Eigen::Matrix3f orientation_at_start = Eigen::Matrix3f::Identity();
-  // Eigen::Vector3f position_at_start    = Eigen::Vector3f::Zero();
+  se3             view_pose             = se3(Eigen::Matrix3f::Identity(), Eigen::Vector3f::Zero());
+  se3             view_pose_at_start    = se3(Eigen::Matrix3f::Identity(), Eigen::Vector3f::Zero());
 
   //
   // Sonar state
@@ -109,8 +105,8 @@ void view_physics() {
   Eigen::AngleAxisf angle_axis_view_angular_velocity = sonder::vector3f_to_angleaxis(gstate.view_angular_velocity);
 
   // Build a rotation matrix from that
-  const auto mat          = angle_axis_view_angular_velocity.toRotationMatrix();
-  gstate.view_orientation = mat * gstate.view_orientation;
+  const auto mat         = angle_axis_view_angular_velocity.toRotationMatrix();
+  gstate.view_pose.so3() = so3(mat * gstate.view_pose.rotationMatrix());
 
   // Apply decay
   gstate.view_angular_velocity = gstate.view_rotation_decay * gstate.view_angular_velocity;
@@ -118,7 +114,7 @@ void view_physics() {
   //
   // Translation decay
   //
-  gstate.view_position += gstate.view_velocity;
+  gstate.view_pose.translation() += gstate.view_velocity;
   gstate.view_velocity *= gstate.view_velocity_decay;
 }
 
@@ -181,7 +177,7 @@ static void timer_event(const int te) {
   }
 
   // Transform "thrust" from view frame to world frame
-  const auto delta = gstate.view_orientation.transpose() * view_acceleration;
+  const auto delta = gstate.view_pose.rotationMatrix().transpose() * view_acceleration;
   gstate.view_velocity += delta;
 
   //
@@ -267,8 +263,8 @@ void keyboard(unsigned char key, int x, int y, bool held) {
 
       case 'P':
         std::cout << "Pose::" << std::endl;
-        std::cout << gstate.view_position.transpose() << "\n----" << std::endl;
-        std::cout << gstate.view_orientation << "\n----" << std::endl;
+        std::cout << gstate.view_pose.translation().transpose() << std::endl;
+        std::cout << gstate.view_pose.rotationMatrix() << std::endl;
 
       case 'v':
         if (gstate.mode == Mode::kNORMAL) {
@@ -321,7 +317,7 @@ void held_mouse_motion(const int x, const int y) {
     // Locally perturb the current view by left-tangent
     if (gstate.mode == Mode::kNORMAL) {
       const auto perturbation = so3::exp(w / 1.0f);
-      gstate.view_orientation = perturbation.matrix() * gstate.orientation_at_start;
+      gstate.view_pose.so3()  = perturbation * gstate.view_pose_at_start.so3();
 
       //
       // Manipulate the orientation of the sonar head
@@ -338,10 +334,10 @@ void held_mouse_motion(const int x, const int y) {
   } else if (gstate.left_mouse_held) {
     const Eigen::Vector3f expressed_motion(relative_motion.x(), -relative_motion.y(), 0.0f);
 
-    const Eigen::Vector3f delta = gstate.view_orientation.transpose() * (5.0 * expressed_motion);
+    const Eigen::Vector3f delta = gstate.view_pose.rotationMatrix().transpose() * (5.0 * expressed_motion);
 
     if (gstate.mode == Mode::kNORMAL) {
-      gstate.view_position = delta + gstate.position_at_start;
+      gstate.view_pose.translation() = delta + gstate.view_pose_at_start.translation();
 
       //
       // Manipulate the position of the sonar head
@@ -376,10 +372,9 @@ void mouse(const int button, const int state, const int x, const int y) {
 
   if (state == GLUT_DOWN) {
     gstate.mouse_down_screen_pos    = pos;
-    gstate.orientation_at_start     = gstate.view_orientation;
-    gstate.position_at_start        = gstate.view_position;
     gstate.mouse_current_screen_pos = pos;
 
+    gstate.view_pose_at_start  = gstate.view_pose;
     gstate.sonar_pose_at_start = gstate.sonar_pose;
 
   } else if (state == GLUT_UP) {
@@ -392,8 +387,9 @@ void mouse(const int button, const int state, const int x, const int y) {
     }
 
     const float           direction = (button == 3) ? 1.0f : -1.0f;
-    const Eigen::Vector3f delta     = gstate.view_orientation.transpose() * Eigen::Vector3f::UnitZ() * 0.2f * direction;
-    gstate.view_position            = gstate.view_position + delta;
+    const Eigen::Vector3f delta =
+        gstate.view_pose.rotationMatrix().transpose() * Eigen::Vector3f::UnitZ() * 0.2f * direction;
+    gstate.view_pose.translation() = gstate.view_pose.translation() + delta;
   }
 }
 
@@ -403,8 +399,6 @@ void draw_sonar_data() {
   //
 
   if (false) {
-    const se3 pose(gstate.view_orientation, gstate.view_position);
-
     const EigStdVector<Eigen::Vector3f> plane         = sonder::sim::make_plane_blanket();
     const EigStdVector<Eigen::Vector2f> range_bearing = sonder::sim::to_range_bearing(
         plane, gstate.sonar_pose, gstate.sonar_params.max_bearing, gstate.sonar_params.max_elevation);
@@ -459,9 +453,9 @@ void display() {
   glMatrixMode(GL_MODELVIEW);
   glLoadIdentity();
 
-  Eigen::Quaternionf q(gstate.view_orientation);
+  Eigen::Quaternionf q(gstate.view_pose.unit_quaternion());
   glRotate(q);
-  glTranslate(gstate.view_position);
+  glTranslate(gstate.view_pose.translation());
 
   //
   // Enable lighting & material settings
@@ -579,9 +573,11 @@ int main(int argc, char** argv) {
   //
   // View Initialization
   //
-  gstate.view_orientation << 0.978117, 0.207935, -0.00695645, 0.006618, 0.00232671, 0.999976, 0.207946, -0.978139,
-      0.000898672;
-  gstate.view_position << -1.40469, 6.51158, -0.350347;
+  Eigen::Matrix3f view_orientation;
+  view_orientation << 0.978117, 0.207935, -0.00695645, 0.006618, 0.00232671, 0.999976, 0.207946, -0.978139, 0.000898672;
+  Eigen::Vector3f view_position(-1.40469, 6.51158, -0.350347);
+
+  gstate.view_pose = se3(view_orientation, view_position);
 
   std::cout << "Starting viewer" << std::endl;
   glutMainLoop();
