@@ -18,7 +18,7 @@ class circle {
   //
   EigStdVector<Eigen::Vector3f> intersect(const circle &other) const {
     // A loose meausure of how precisely we expect circles to coincide
-    constexpr float EPS = 1e-1f;
+    constexpr float EPS = 1e-4f;
 
     const plane this_plane  = plane(normal, center);
     const plane other_plane = plane(other.normal, other.center);
