@@ -23,27 +23,28 @@ enum ManipulationMode : int16_t {
 };
 
 struct SonarParams {
-  float max_bearing   = 1.1f;
-  float max_elevation = 0.4f;
+  float max_bearing   = 1.1f;  // Max bearing for the sonar view
+  float max_elevation = 0.4f;  // Max elevation for the sonar view
 };
 
 struct State {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 
-  //
+  /////////////////////////////////////////////////////////////////////////////////////////////////
   // Lighting configuration
   //
+
   GLfloat light_ambient[4]  = {0.2f, 0.2f, 0.2f, 1.0f};
   GLfloat light_diffuse[4]  = {0.5f, 0.5f, 0.5f, 1.0f};
   GLfloat light_position[4] = {5.0f, 5.0f, -10.0f, 1.0f};
   GLfloat mat_specular[4]   = {0.2f, 0.2f, 0.2f, 1.0f};
 
-  //
+  /////////////////////////////////////////////////////////////////////////////////////////////////
   // View configuration
   //
   bool use_orthographic_projection = false;
 
-  //
+  /////////////////////////////////////////////////////////////////////////////////////////////////
   // Camera pose
   //
 
@@ -58,39 +59,47 @@ struct State {
   float           view_rotation_decay   = 0.9f;
   Eigen::Vector3f view_angular_velocity = Eigen::Vector3f::Zero();
   se3             view_pose             = se3(Eigen::Matrix3f::Identity(), Eigen::Vector3f::Zero());
-  se3             view_pose_at_start    = se3(Eigen::Matrix3f::Identity(), Eigen::Vector3f::Zero());
 
-  //
+  /////////////////////////////////////////////////////////////////////////////////////////////////
   // Sonar state
   //
 
-  se3         sonar_pose_at_start = se3(Eigen::Matrix3f::Identity(), Eigen::Vector3f::Zero());
-  se3         sonar_pose          = se3(Eigen::Matrix3f::Identity(), Eigen::Vector3f::Zero());
+  se3         sonar_pose = se3(Eigen::Matrix3f::Identity(), Eigen::Vector3f::Zero());
   SonarParams sonar_params;
 
+  /////////////////////////////////////////////////////////////////////////////////////////////////
+  // Belief state
+  //
   std::vector<sonder::circular_section> sections;
   EigStdVector<Eigen::Vector3f>         intersection_estimates;
-  se3                                   last_capture_pose = se3(Eigen::Matrix3f::Random(), Eigen::Vector3f::Random());
 
-  //
+  /////////////////////////////////////////////////////////////////////////////////////////////////
   // View State
   //
+
   // Fixed width/height
   int width = 800;
 
-  //
+  /////////////////////////////////////////////////////////////////////////////////////////////////
   // Input state
   //
-  // This list is also the precedence ordering for single-input commands
-  //
+
+  // Store which object we are manipulating
   ManipulationMode manipulation_mode = ManipulationMode::kNORMAL;
 
+  // This list is also the precedence ordering for single-input commands
   bool left_mouse_held   = false;
   bool right_mouse_held  = false;
   bool scroll_mouse_held = false;
 
+  // Store mouse state to compute relative motion
   Eigen::Vector2f mouse_down_screen_pos    = Eigen::Vector2f(0.0f, 0.0f);
   Eigen::Vector2f mouse_current_screen_pos = Eigen::Vector2f(0.0f, 0.0f);
+
+  // Store pose states to apply relative motions
+  se3 view_pose_at_start  = se3(Eigen::Matrix3f::Identity(), Eigen::Vector3f::Zero());
+  se3 sonar_pose_at_start = se3(Eigen::Matrix3f::Identity(), Eigen::Vector3f::Zero());
+  se3 last_capture_pose   = se3(Eigen::Matrix3f::Random(), Eigen::Vector3f::Random());
 
   // Keys
   std::map<unsigned char, bool> held_keys;
@@ -219,9 +228,9 @@ static void timer_event(const int te) {
   glutPostRedisplay();
 }
 
-///////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////
 // Initialization
-///////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Setup our Opengl world, called once at startup.
 void default_init() {
@@ -249,9 +258,10 @@ void default_init() {
   glEnable(GL_BLEND);
 }
 
-///////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////
 // Callbacks
-///////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
 void keyboard(unsigned char key, int x, int y, bool held) {
   //
   // Handle single-touch input keys (No special behavior if held down)
@@ -259,6 +269,7 @@ void keyboard(unsigned char key, int x, int y, bool held) {
   if (held) {
     switch (key) {
       case 'p':
+        std::cout << "Switching projection mode" << std::endl;
         gstate.use_orthographic_projection = !gstate.use_orthographic_projection;
         break;
 
@@ -309,47 +320,57 @@ void special_keys_up(const int key, const int x, const int y) {
   process_special_keys(key, x, y, false);
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////////////
+// Mouse motion callbacks
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
 void held_mouse_motion(const int x, const int y) {
   const Eigen::Vector2f pos       = Eigen::Vector2f(static_cast<float>(x), static_cast<float>(y)) / gstate.width;
   gstate.mouse_current_screen_pos = pos;
 
   const Eigen::Vector2f relative_motion = pos - gstate.mouse_down_screen_pos;
 
-  //
-  // Right mouse drag
-  //
   if (gstate.right_mouse_held) {
+    //
+    // Right mouse drag
+    //
+    // Locally perturb something by treating mouse motion as a left-tangent scaling
+
     const so3::Tangent w(relative_motion.y(), relative_motion.x(), 0.0f);
+    const auto         perturbation = so3::exp(w / 1.0f);
 
-    // Locally perturb the current view by left-tangent
+    //
+    // Manipulate orientation of the selected object (View or sonar head)
+    //
     if (gstate.manipulation_mode == ManipulationMode::kNORMAL) {
-      const auto perturbation = so3::exp(w / 1.0f);
-      gstate.view_pose.so3()  = perturbation * gstate.view_pose_at_start.so3();
+      gstate.view_pose.so3() = perturbation * gstate.view_pose_at_start.so3();
 
-      //
-      // Manipulate the orientation of the sonar head
-      //
     } else if (gstate.manipulation_mode == ManipulationMode::kSONAR) {
-      const auto perturbation = so3::exp(w / 1.0f);
-      gstate.sonar_pose.so3() =
-          gstate.view_pose.so3().inverse() * perturbation * gstate.view_pose.so3() * gstate.sonar_pose_at_start.so3();
+      // Transform the perturbation so that it appears to happen relative to our own view
+      const so3 view_orientation                  = gstate.view_pose.so3();
+      const so3 perturbation_apparent_local_frame = view_orientation.inverse() * perturbation * view_orientation;
+
+      gstate.sonar_pose.so3() = perturbation_apparent_local_frame * gstate.sonar_pose_at_start.so3();
     }
 
+  } else if (gstate.left_mouse_held) {
     //
     // Left mouse drag
     //
     // Second in precedence ordering
-  } else if (gstate.left_mouse_held) {
+
+    // Get movement in screen coordinates
     const Eigen::Vector3f expressed_motion(relative_motion.x(), -relative_motion.y(), 0.0f);
 
+    // Transform screen motion into world motion
     const Eigen::Vector3f delta = gstate.view_pose.rotationMatrix().transpose() * (5.0 * expressed_motion);
 
+    //
+    // Manipulate translation of the selected object (View or sonar head)
+    //
     if (gstate.manipulation_mode == ManipulationMode::kNORMAL) {
       gstate.view_pose.translation() = delta + gstate.view_pose_at_start.translation();
 
-      //
-      // Manipulate the position of the sonar head
-      //
     } else if (gstate.manipulation_mode == ManipulationMode::kSONAR) {
       gstate.sonar_pose.translation() = delta + gstate.sonar_pose_at_start.translation();
     }
@@ -378,6 +399,9 @@ void mouse(const int button, const int state, const int x, const int y) {
   const Eigen::Vector2f pos = Eigen::Vector2f(static_cast<float>(x), static_cast<float>(y)) / gstate.width;
   update_mouse_state(button, state == GLUT_DOWN);
 
+  //
+  // Handle storing state for a mouse press
+  //
   if (state == GLUT_DOWN) {
     gstate.mouse_down_screen_pos    = pos;
     gstate.mouse_current_screen_pos = pos;
@@ -388,33 +412,51 @@ void mouse(const int button, const int state, const int x, const int y) {
   } else if (state == GLUT_UP) {
   }
 
-  // It's a wheel event
+  //
+  // Handle scroll-wheel events
+  //
   if ((button == 3) || (button == 4)) {
     if (state == GLUT_UP) {
       return;
     }
 
-    const float           direction = (button == 3) ? 1.0f : -1.0f;
-    const Eigen::Vector3f delta =
-        gstate.view_pose.rotationMatrix().transpose() * Eigen::Vector3f::UnitZ() * 0.2f * direction;
+    // The direction is governed which direction the wheel is being turned
+    const float direction = (button == 3) ? 1.0f : -1.0f;
+
+    // Project the motion in screen coordinates into world coordinates
+    const Eigen::Vector3f delta    = gstate.view_pose.so3().inverse() * Eigen::Vector3f::UnitZ() * direction;
     gstate.view_pose.translation() = gstate.view_pose.translation() + delta;
   }
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////////////
+// Generic geometry
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
 EigStdVector<Eigen::Vector3f> intersect_all_sections(const sonder::circular_section&              section,
                                                      const std::vector<sonder::circular_section>& other_sections) {
+  constexpr float MIN_DIST_TO_ADD = 1e-3;
+
   EigStdVector<Eigen::Vector3f> all_intersections;
   all_intersections.reserve(10);
 
+  //
+  // Seek an intersection among `other_sections`
+  //
   for (const auto& other_section : other_sections) {
     const auto intersections = section.intersect(other_section);
     for (const auto& pt : intersections) {
+      //
+      // Don't add a point if it is <1mm away from an existing point
+      //
+      // todo(jpanikulam): Factor into a new function
       bool add = true;
       for (const auto& other_pt : all_intersections) {
-        if ((pt - other_pt).norm() < 1e-3) {
+        if ((pt - other_pt).norm() < MIN_DIST_TO_ADD) {
           add = false;
         }
       }
+      // If this point is truly unique, we add it
       if (add) {
         all_intersections.push_back(pt);
       }
@@ -423,6 +465,10 @@ EigStdVector<Eigen::Vector3f> intersect_all_sections(const sonder::circular_sect
   return all_intersections;
 }
 
+/////////////////////////////////////////////////////////////////////////////////////////////////
+// Display
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
 void draw_sonar_data() {
   //
   // Rendering a field of points
@@ -430,7 +476,7 @@ void draw_sonar_data() {
 
   // Minimum constants for updating the belief
   constexpr float MIN_TRANSLATION = 0.5f;
-  constexpr float MIN_ROTATION = 0.4f;
+  constexpr float MIN_ROTATION    = 0.4f;
 
   {
     const EigStdVector<Eigen::Vector3f> plane         = sonder::sim::make_plane_blanket();
@@ -449,7 +495,6 @@ void draw_sonar_data() {
         sonder::draw_point(pt, 0.05f);
       }
     }
-
 
     const float delta_position = (gstate.last_capture_pose.translation() - gstate.sonar_pose.translation()).norm();
     const float delta_orientation =
@@ -474,7 +519,7 @@ void draw_sonar_data() {
         // --> TODO: Try std::moveing this
         const EigStdVector<Eigen::Vector3f> intersections = intersect_all_sections(circ_sec, gstate.sections);
         if (intersections.size() > 0) {
-          for (const auto & pt : intersections) {
+          for (const auto& pt : intersections) {
             gstate.intersection_estimates.push_back(pt);
           }
         }
@@ -510,14 +555,11 @@ void display() {
     gluPerspective(60.0f, 1.0f, 1.0f, 1000.0f);
   }
 
+  //
+  // Set up the current view
+  //
   glMatrixMode(GL_MODELVIEW);
   glLoadIdentity();
-
-  // const auto         view_pose_inv = gstate.view_pose.inverse();
-  // glTranslate(view_pose_inv.translation());
-  // Eigen::Quaternionf q(view_pose_inv.unit_quaternion());
-  // glRotate(q);
-
   Eigen::Quaternionf q(gstate.view_pose.unit_quaternion());
   glRotate(q);
   glTranslate(gstate.view_pose.translation());
@@ -543,40 +585,14 @@ void display() {
   }
 
   //
-  // Disabled for now
+  // Draw the universal origin
   //
-  if (true) {
-    sonder::draw_coordinate_system();
-  }
+  sonder::draw_coordinate_system();
 
+  //
+  // Draw the sonar and sonar related nonsense
+  //
   draw_sonar_data();
-
-  if (false) {
-    glColor3f(0.0f, 1.0f, 0.0f);
-    const sonder::circle my_circle(Eigen::Vector3f::UnitZ(), Eigen::Vector3f(0.0, 0.0, 0.0), 2.0f);
-    sonder::draw_circle(my_circle);
-
-    const sonder::circle my_circle2(Eigen::Vector3f::UnitX(), Eigen::Vector3f::Zero(), 2.0f);
-    sonder::draw_circle(my_circle2);
-
-    glColor4f(0.0f, 0.2f, 0.5f, 0.6f);
-    const sonder::plane my_plane(my_circle.normal, my_circle.center);
-    sonder::draw_plane(my_plane);
-
-    glColor4f(0.0f, 0.5f, 0.2f, 0.6f);
-    const sonder::plane my_plane2(my_circle2.normal, my_circle2.center);
-    sonder::draw_plane(my_plane2);
-
-    glColor4f(1.0f, 0.0f, 0.0f, 1.0f);
-    const sonder::line intersection_line = my_plane2.intersect(my_plane);
-    sonder::draw_line(intersection_line);
-
-    glColor4f(0.8, 0.1, 0.0, 1.0);
-    const auto intersection_list = my_circle2.intersect(my_circle);
-    for (std::size_t k = 0; k < intersection_list.size(); ++k) {
-      sonder::draw_point(intersection_list[k], 0.1f);
-    }
-  }
 
   // Draw on the "HUD" as it were, with a second mvp setup
   {

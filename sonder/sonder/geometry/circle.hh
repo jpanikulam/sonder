@@ -13,6 +13,15 @@ class circle {
       : normal(_normal), center(_center), radius(_radius) {
   }
 
+  // Compute the intersection of two circles in 3D
+  //
+  // For non-coplanar circles, that is up to two points
+  //
+  // It does this by:
+  // 1. Computing the intersection line of the planes in which the circles lie
+  // 2. Computing the intersection of circle[1] with that line
+  // 3. Returning the points from (2) that also lie on circle[2]
+  //
   // TODO: Do something when parallel non-coplanar
   //  (The intersection line should be garbage in that case)
   //

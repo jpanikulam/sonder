@@ -40,16 +40,13 @@ EigStdVector<Eigen::Vector2f> to_range_bearing(const EigStdVector<Eigen::Vector3
 EigStdVector<Eigen::Vector3f> make_plane_blanket() {
   EigStdVector<Eigen::Vector3f> points;
   for (float x = 1.0; x < 3.0; x += 1.0) {
-    for (float y = -1.0; y <= 1.0; y += 0.99) {
-      points.emplace_back(x, y, 0.0);
+    for (float y = -1.0; y <= 1.0; y += 1.0) {
+      for (float z = 0.0; z <= 1.0; z += 1.0) {
+        points.emplace_back(x, y, z);
+      }
     }
   }
 
-  //  points.emplace_back(1.0f, -1.0f, 0.0f);
-  //  points.emplace_back(1.0f, 1.0f, 0.0f);
-  //
-  //  points.emplace_back(1.0f, 1.0f, 1.0f);
-  //  points.emplace_back(1.0f, -1.0f, -1.0f);
   return points;
 }
 }

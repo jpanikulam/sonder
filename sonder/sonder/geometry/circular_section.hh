@@ -20,8 +20,17 @@ class circular_section {
         spanning_circle(_normal, _center, _radius) {
     _cos_arc_rads = std::cos(_arc_rads);
   }
+
+  // Compute the intersection point(s) of two circular arcs
+  //
+  // Do this by:
+  // 1. Computing the intersection point(s) of two circles
+  // 2. Determining whether those intersection point(s) lie on **BOTH** arcs
+  // 3. Returning only the point(s) that do
+  //
   EigStdVector<Eigen::Vector3f> intersect(const circular_section &other) const {
-    EigStdVector<Eigen::Vector3f>       intersections;
+    EigStdVector<Eigen::Vector3f> intersections;
+
     const EigStdVector<Eigen::Vector3f> candidate_intersections = spanning_circle.intersect(other.spanning_circle);
     for (const auto &candidate : candidate_intersections) {
       const bool on_both_arcs = is_point_on_circle_on_arc(candidate) && other.is_point_on_circle_on_arc(candidate);
@@ -29,8 +38,6 @@ class circular_section {
       if (on_both_arcs) {
         intersections.emplace_back(candidate);
       }
-
-      // std::cout << dot << " : " << _cos_arc_rads << std::endl;
     }
 
     return intersections;
@@ -45,8 +52,7 @@ class circular_section {
 
   const circle spanning_circle = circle(Eigen::Vector3f::Zero(), Eigen::Vector3f::Zero(), 0.0);
 
-  // Does a point that already lies on the circle lie on the arc?
-  //
+  // Determine whether a point [which is already known to lie on the circle] lies on the arc
   //
   bool is_point_on_circle_on_arc(const Eigen::Vector3f &pt) const {
     const auto  difference = (pt - center).normalized();
