@@ -35,7 +35,7 @@ include_directories("${BASEPATH}/third_party/Sophus")
 #########################
 # gcc flags
 #
-set(CMAKE_CXX_FLAGS "--std=c++11 -Wall -Wno-unused-variable -Wno-unused-function ${CMAKE_CXX_FLAGS}")
+set(CMAKE_CXX_FLAGS "--std=c++11 -O2 -Wall -Wno-unused-variable -Wno-unused-function ${CMAKE_CXX_FLAGS}")
 
 #########################
 # Create sonar_viz
