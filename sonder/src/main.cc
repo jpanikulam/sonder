@@ -17,7 +17,10 @@
 
 #include <sophus/se3.hpp>
 
-enum Mode : int16_t { kNORMAL, kSONAR };
+enum ManipulationMode : int16_t {
+  kNORMAL,  // Manipulate the camera view
+  kSONAR    // Manipulate the sonar view
+};
 
 struct SonarParams {
   float max_bearing   = 1.1f;
@@ -66,6 +69,7 @@ struct State {
   SonarParams sonar_params;
 
   std::vector<sonder::circular_section> sections;
+  EigStdVector<Eigen::Vector3f>         intersection_estimates;
   se3                                   last_capture_pose = se3(Eigen::Matrix3f::Random(), Eigen::Vector3f::Random());
 
   //
@@ -79,7 +83,7 @@ struct State {
   //
   // This list is also the precedence ordering for single-input commands
   //
-  Mode mode = Mode::kNORMAL;
+  ManipulationMode manipulation_mode = ManipulationMode::kNORMAL;
 
   bool left_mouse_held   = false;
   bool right_mouse_held  = false;
@@ -101,12 +105,8 @@ void view_physics() {
   //
   // view_Orientation decay
   //
-  // Create an angleaxis from the angular velocity
-  Eigen::AngleAxisf angle_axis_view_angular_velocity = sonder::vector3f_to_angleaxis(gstate.view_angular_velocity);
-
   // Build a rotation matrix from that
-  const auto mat         = angle_axis_view_angular_velocity.toRotationMatrix();
-  gstate.view_pose.so3() = so3(mat * gstate.view_pose.rotationMatrix());
+  gstate.view_pose.so3() = so3::exp(gstate.view_angular_velocity) * gstate.view_pose.so3();
 
   // Apply decay
   gstate.view_angular_velocity = gstate.view_rotation_decay * gstate.view_angular_velocity;
@@ -129,7 +129,7 @@ static void timer_event(const int te) {
   //
   // Handle normal keys that are currently held down
   //
-  for (auto const& key_el : gstate.held_keys) {
+  for (const auto& key_el : gstate.held_keys) {
     if (!key_el.second) {
       // Skip if key not held
       continue;
@@ -177,13 +177,14 @@ static void timer_event(const int te) {
   }
 
   // Transform "thrust" from view frame to world frame
-  const auto delta = gstate.view_pose.rotationMatrix().transpose() * view_acceleration;
+  // (Must force evaluation)
+  const Eigen::Vector3f delta = gstate.view_pose.so3().inverse() * view_acceleration;
   gstate.view_velocity += delta;
 
   //
   // Handle special keys that are currently held down
   //
-  for (auto const& special_key_el : gstate.held_specials) {
+  for (const auto& special_key_el : gstate.held_specials) {
     if (!special_key_el.second) {
       // Skip if key not held
       continue;
@@ -267,13 +268,19 @@ void keyboard(unsigned char key, int x, int y, bool held) {
         std::cout << gstate.view_pose.rotationMatrix() << std::endl;
 
       case 'v':
-        if (gstate.mode == Mode::kNORMAL) {
-          gstate.mode = Mode::kSONAR;
+        if (gstate.manipulation_mode == ManipulationMode::kNORMAL) {
+          gstate.manipulation_mode = ManipulationMode::kSONAR;
           std::cout << "Switching mode to sonar" << std::endl;
         } else {
-          gstate.mode = Mode::kNORMAL;
+          gstate.manipulation_mode = ManipulationMode::kNORMAL;
           std::cout << "Switching mode to normal" << std::endl;
         }
+        break;
+
+      case 'G':
+        std::cout << "Clearing observation history" << std::endl;
+        gstate.sections.clear();
+        gstate.intersection_estimates.clear();
         break;
 
       case 'Q':
@@ -315,16 +322,17 @@ void held_mouse_motion(const int x, const int y) {
     const so3::Tangent w(relative_motion.y(), relative_motion.x(), 0.0f);
 
     // Locally perturb the current view by left-tangent
-    if (gstate.mode == Mode::kNORMAL) {
+    if (gstate.manipulation_mode == ManipulationMode::kNORMAL) {
       const auto perturbation = so3::exp(w / 1.0f);
       gstate.view_pose.so3()  = perturbation * gstate.view_pose_at_start.so3();
 
       //
       // Manipulate the orientation of the sonar head
       //
-    } else if (gstate.mode == Mode::kSONAR) {
+    } else if (gstate.manipulation_mode == ManipulationMode::kSONAR) {
       const auto perturbation = so3::exp(w / 1.0f);
-      gstate.sonar_pose.so3() = perturbation * gstate.sonar_pose_at_start.so3();
+      gstate.sonar_pose.so3() =
+          gstate.view_pose.so3().inverse() * perturbation * gstate.view_pose.so3() * gstate.sonar_pose_at_start.so3();
     }
 
     //
@@ -336,13 +344,13 @@ void held_mouse_motion(const int x, const int y) {
 
     const Eigen::Vector3f delta = gstate.view_pose.rotationMatrix().transpose() * (5.0 * expressed_motion);
 
-    if (gstate.mode == Mode::kNORMAL) {
+    if (gstate.manipulation_mode == ManipulationMode::kNORMAL) {
       gstate.view_pose.translation() = delta + gstate.view_pose_at_start.translation();
 
       //
       // Manipulate the position of the sonar head
       //
-    } else if (gstate.mode == Mode::kSONAR) {
+    } else if (gstate.manipulation_mode == ManipulationMode::kSONAR) {
       gstate.sonar_pose.translation() = delta + gstate.sonar_pose_at_start.translation();
     }
   }
@@ -393,23 +401,61 @@ void mouse(const int button, const int state, const int x, const int y) {
   }
 }
 
+EigStdVector<Eigen::Vector3f> intersect_all_sections(const sonder::circular_section&              section,
+                                                     const std::vector<sonder::circular_section>& other_sections) {
+  EigStdVector<Eigen::Vector3f> all_intersections;
+  all_intersections.reserve(10);
+
+  for (const auto& other_section : other_sections) {
+    const auto intersections = section.intersect(other_section);
+    for (const auto& pt : intersections) {
+      bool add = true;
+      for (const auto& other_pt : all_intersections) {
+        if ((pt - other_pt).norm() < 1e-3) {
+          add = false;
+        }
+      }
+      if (add) {
+        all_intersections.push_back(pt);
+      }
+    }
+  }
+  return all_intersections;
+}
+
 void draw_sonar_data() {
   //
   // Rendering a field of points
   //
 
-  if (false) {
+  // Minimum constants for updating the belief
+  constexpr float MIN_TRANSLATION = 0.5f;
+  constexpr float MIN_ROTATION = 0.4f;
+
+  {
     const EigStdVector<Eigen::Vector3f> plane         = sonder::sim::make_plane_blanket();
     const EigStdVector<Eigen::Vector2f> range_bearing = sonder::sim::to_range_bearing(
         plane, gstate.sonar_pose, gstate.sonar_params.max_bearing, gstate.sonar_params.max_elevation);
 
-    for (const auto& pt : plane) {
-      sonder::draw_point(pt, 0.1f);
+    if (false) {
+      for (const auto& pt : plane) {
+        sonder::draw_point(pt, 0.1f);
+      }
     }
 
-    glColor3f(0.0f, 0.7f, 0.1f);
+    if (true) {
+      for (const auto& pt : gstate.intersection_estimates) {
+        glColor3f(0.0, 0.4, 0.8);
+        sonder::draw_point(pt, 0.05f);
+      }
+    }
 
-    if ((gstate.last_capture_pose.translation() - gstate.sonar_pose.translation()).norm() > 0.5f) {
+
+    const float delta_position = (gstate.last_capture_pose.translation() - gstate.sonar_pose.translation()).norm();
+    const float delta_orientation =
+        (so3::log(gstate.last_capture_pose.so3() * gstate.sonar_pose.so3().inverse())).norm();
+
+    if ((delta_position > MIN_TRANSLATION) || (delta_orientation > MIN_ROTATION)) {
       gstate.last_capture_pose = gstate.sonar_pose;
 
       for (const auto& rb : range_bearing) {
@@ -424,12 +470,26 @@ void draw_sonar_data() {
                                                 2.0f * gstate.sonar_params.max_elevation);
 
         gstate.sections.push_back(circ_sec);
+
+        // --> TODO: Try std::moveing this
+        const EigStdVector<Eigen::Vector3f> intersections = intersect_all_sections(circ_sec, gstate.sections);
+        if (intersections.size() > 0) {
+          for (const auto & pt : intersections) {
+            gstate.intersection_estimates.push_back(pt);
+          }
+        }
       }
     }
   }
 
+  glColor3f(0.0f, 0.7f, 0.1f);
   for (const auto& circ_sec : gstate.sections) {
     sonder::draw_circular_section(circ_sec);
+  }
+
+  glColor3f(0.9f, 0.4f, 0.2f);
+  for (const auto& circ_sec : gstate.sections) {
+    sonder::draw_circle(circ_sec.spanning_circle);
   }
 
   //
@@ -452,6 +512,11 @@ void display() {
 
   glMatrixMode(GL_MODELVIEW);
   glLoadIdentity();
+
+  // const auto         view_pose_inv = gstate.view_pose.inverse();
+  // glTranslate(view_pose_inv.translation());
+  // Eigen::Quaternionf q(view_pose_inv.unit_quaternion());
+  // glRotate(q);
 
   Eigen::Quaternionf q(gstate.view_pose.unit_quaternion());
   glRotate(q);
