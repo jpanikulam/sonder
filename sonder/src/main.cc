@@ -1,6 +1,6 @@
-#include <math.h>  // Math library (Higher math functions )
 #include <iostream>
 #include <map>
+#include <math.h> // Math library (Higher math functions )
 
 #include <Eigen/Dense>
 #include <sonder/opengl.hh>
@@ -12,19 +12,21 @@
 #include <sonder/geometry/line.hh>
 #include <sonder/geometry/plane.hh>
 
+#include <sonder/belief.hh>
+
 #include <sonder/gl_shapes.hh>
 #include <sonder/types.hh>
 
 #include <sophus/se3.hpp>
 
 enum ManipulationMode : int16_t {
-  kNORMAL,  // Manipulate the camera view
-  kSONAR    // Manipulate the sonar view
+  kNORMAL, // Manipulate the camera view
+  kSONAR   // Manipulate the sonar view
 };
 
 struct SonarParams {
-  float max_bearing   = 1.1f;  // Max bearing for the sonar view
-  float max_elevation = 0.4f;  // Max elevation for the sonar view
+  float max_bearing   = 1.1f; // Max bearing for the sonar view
+  float max_elevation = 0.4f; // Max elevation for the sonar view
 };
 
 struct State {
@@ -71,7 +73,9 @@ struct State {
   // Belief state
   //
   std::vector<sonder::circular_section> sections;
-  EigStdVector<Eigen::Vector3f>         intersection_estimates;
+  sonder::IntersectionVotes             intersection_estimates;
+  // PointList                             intersection_estimates;
+  // std::vector<int>                      votes;
 
   /////////////////////////////////////////////////////////////////////////////////////////////////
   // View State
@@ -138,50 +142,50 @@ static void timer_event(const int te) {
   //
   // Handle normal keys that are currently held down
   //
-  for (const auto& key_el : gstate.held_keys) {
+  for (const auto &key_el : gstate.held_keys) {
     if (!key_el.second) {
       // Skip if key not held
       continue;
     }
     switch (key_el.first) {
-      case 27:
-        glutDestroyWindow(glutGetWindow());
-        return;
+    case 27:
+      glutDestroyWindow(glutGetWindow());
+      return;
 
-      case 'w':
-        view_acceleration += Eigen::Vector3f(0.0f, 0.0f, gstate.velocity_scaling);
-        break;
+    case 'w':
+      view_acceleration += Eigen::Vector3f(0.0f, 0.0f, gstate.velocity_scaling);
+      break;
 
-      case 'a':
-        view_acceleration += Eigen::Vector3f(gstate.velocity_scaling, 0.0f, 0.0f);
-        break;
+    case 'a':
+      view_acceleration += Eigen::Vector3f(gstate.velocity_scaling, 0.0f, 0.0f);
+      break;
 
-      case 's':
-        view_acceleration += Eigen::Vector3f(0.0f, 0.0f, -gstate.velocity_scaling);
-        break;
+    case 's':
+      view_acceleration += Eigen::Vector3f(0.0f, 0.0f, -gstate.velocity_scaling);
+      break;
 
-      case 'd':
-        view_acceleration += Eigen::Vector3f(-gstate.velocity_scaling, 0.0f, 0.0f);
-        break;
+    case 'd':
+      view_acceleration += Eigen::Vector3f(-gstate.velocity_scaling, 0.0f, 0.0f);
+      break;
 
-      case 'c':
-        view_acceleration += Eigen::Vector3f(0.0f, -gstate.velocity_scaling, 0.0f);
-        break;
+    case 'c':
+      view_acceleration += Eigen::Vector3f(0.0f, -gstate.velocity_scaling, 0.0f);
+      break;
 
-      case 'z':
-        view_acceleration += Eigen::Vector3f(0.0f, gstate.velocity_scaling, 0.0f);
-        break;
+    case 'z':
+      view_acceleration += Eigen::Vector3f(0.0f, gstate.velocity_scaling, 0.0f);
+      break;
 
-      case 'q':
-        view_angular_acceleration += -Eigen::Vector3f(0.0f, 0.0f, 1.0f);
-        break;
+    case 'q':
+      view_angular_acceleration += -Eigen::Vector3f(0.0f, 0.0f, 1.0f);
+      break;
 
-      case 'e':
-        view_angular_acceleration += Eigen::Vector3f(0.0f, 0.0f, 1.0f);
-        break;
+    case 'e':
+      view_angular_acceleration += Eigen::Vector3f(0.0f, 0.0f, 1.0f);
+      break;
 
-      default:
-        break;
+    default:
+      break;
     }
   }
 
@@ -193,34 +197,34 @@ static void timer_event(const int te) {
   //
   // Handle special keys that are currently held down
   //
-  for (const auto& special_key_el : gstate.held_specials) {
+  for (const auto &special_key_el : gstate.held_specials) {
     if (!special_key_el.second) {
       // Skip if key not held
       continue;
     }
 
     switch (special_key_el.first) {
-      case GLUT_KEY_LEFT: {
-        view_angular_acceleration += -Eigen::Vector3f(0.0f, 1.0f, 0.0f);
-      } break;
+    case GLUT_KEY_LEFT: {
+      view_angular_acceleration += -Eigen::Vector3f(0.0f, 1.0f, 0.0f);
+    } break;
 
-      case GLUT_KEY_RIGHT: {
-        view_angular_acceleration += Eigen::Vector3f(0.0f, 1.0f, 0.0f);
+    case GLUT_KEY_RIGHT: {
+      view_angular_acceleration += Eigen::Vector3f(0.0f, 1.0f, 0.0f);
 
-      } break;
+    } break;
 
-      case GLUT_KEY_UP: {
-        view_angular_acceleration += Eigen::Vector3f(1.0f, 0.0f, 0.0f);
+    case GLUT_KEY_UP: {
+      view_angular_acceleration += Eigen::Vector3f(1.0f, 0.0f, 0.0f);
 
-      } break;
+    } break;
 
-      case GLUT_KEY_DOWN: {
-        view_angular_acceleration += -Eigen::Vector3f(1.0f, 0.0f, 0.0f);
+    case GLUT_KEY_DOWN: {
+      view_angular_acceleration += -Eigen::Vector3f(1.0f, 0.0f, 0.0f);
 
-      } break;
+    } break;
 
-      default:
-        break;
+    default:
+      break;
     }
   }
   gstate.view_angular_velocity += gstate.angular_velocity_scaling * view_angular_acceleration;
@@ -268,36 +272,36 @@ void keyboard(unsigned char key, int x, int y, bool held) {
   //
   if (held) {
     switch (key) {
-      case 'p':
-        std::cout << "Switching projection mode" << std::endl;
-        gstate.use_orthographic_projection = !gstate.use_orthographic_projection;
-        break;
+    case 'p':
+      std::cout << "Switching projection mode" << std::endl;
+      gstate.use_orthographic_projection = !gstate.use_orthographic_projection;
+      break;
 
-      case 'P':
-        std::cout << "Pose::" << std::endl;
-        std::cout << gstate.view_pose.translation().transpose() << std::endl;
-        std::cout << gstate.view_pose.rotationMatrix() << std::endl;
+    case 'P':
+      std::cout << "Pose::" << std::endl;
+      std::cout << gstate.view_pose.translation().transpose() << std::endl;
+      std::cout << gstate.view_pose.rotationMatrix() << std::endl;
 
-      case 'v':
-        if (gstate.manipulation_mode == ManipulationMode::kNORMAL) {
-          gstate.manipulation_mode = ManipulationMode::kSONAR;
-          std::cout << "Switching mode to sonar" << std::endl;
-        } else {
-          gstate.manipulation_mode = ManipulationMode::kNORMAL;
-          std::cout << "Switching mode to normal" << std::endl;
-        }
-        break;
+    case 'v':
+      if (gstate.manipulation_mode == ManipulationMode::kNORMAL) {
+        gstate.manipulation_mode = ManipulationMode::kSONAR;
+        std::cout << "Switching mode to sonar" << std::endl;
+      } else {
+        gstate.manipulation_mode = ManipulationMode::kNORMAL;
+        std::cout << "Switching mode to normal" << std::endl;
+      }
+      break;
 
-      case 'G':
-        std::cout << "Clearing observation history" << std::endl;
-        gstate.sections.clear();
-        gstate.intersection_estimates.clear();
-        break;
+    case 'G':
+      std::cout << "Clearing observation history" << std::endl;
+      gstate.sections.clear();
+      gstate.intersection_estimates.clear();
+      break;
 
-      case 'Q':
-        std::cout << "Attempting to exit" << std::endl;
-        glutDestroyWindow(glutGetWindow());
-        return;
+    case 'Q':
+      std::cout << "Attempting to exit" << std::endl;
+      glutDestroyWindow(glutGetWindow());
+      return;
     }
   }
   gstate.held_keys[key] = held;
@@ -381,17 +385,17 @@ void held_mouse_motion(const int x, const int y) {
 
 void update_mouse_state(const int button, const bool held) {
   switch (button) {
-    case 0:
-      gstate.left_mouse_held = held;
-      break;
-    case 1:
-      gstate.scroll_mouse_held = held;
-      break;
-    case 2:
-      gstate.right_mouse_held = held;
-      break;
-    default:
-      break;
+  case 0:
+    gstate.left_mouse_held = held;
+    break;
+  case 1:
+    gstate.scroll_mouse_held = held;
+    break;
+  case 2:
+    gstate.right_mouse_held = held;
+    break;
+  default:
+    break;
   }
 }
 
@@ -433,33 +437,19 @@ void mouse(const int button, const int state, const int x, const int y) {
 // Generic geometry
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-EigStdVector<Eigen::Vector3f> intersect_all_sections(const sonder::circular_section&              section,
-                                                     const std::vector<sonder::circular_section>& other_sections) {
+sonder::IntersectionVotes intersect_all_sections(const sonder::circular_section &             section,
+                                                 const std::vector<sonder::circular_section> &other_sections) {
   constexpr float MIN_DIST_TO_ADD = 1e-3;
 
-  EigStdVector<Eigen::Vector3f> all_intersections;
-  all_intersections.reserve(10);
+  sonder::IntersectionVotes all_intersections;
 
   //
   // Seek an intersection among `other_sections`
   //
-  for (const auto& other_section : other_sections) {
+  for (const auto &other_section : other_sections) {
     const auto intersections = section.intersect(other_section);
-    for (const auto& pt : intersections) {
-      //
-      // Don't add a point if it is <1mm away from an existing point
-      //
-      // todo(jpanikulam): Factor into a new function
-      bool add = true;
-      for (const auto& other_pt : all_intersections) {
-        if ((pt - other_pt).norm() < MIN_DIST_TO_ADD) {
-          add = false;
-        }
-      }
-      // If this point is truly unique, we add it
-      if (add) {
-        all_intersections.push_back(pt);
-      }
+    for (const auto &pt : intersections) {
+      all_intersections.add_point(pt);
     }
   }
   return all_intersections;
@@ -479,18 +469,18 @@ void draw_sonar_data() {
   constexpr float MIN_ROTATION    = 0.4f;
 
   {
-    const EigStdVector<Eigen::Vector3f> plane         = sonder::sim::make_plane_blanket();
+    const PointList                     plane         = sonder::sim::make_plane_blanket();
     const EigStdVector<Eigen::Vector2f> range_bearing = sonder::sim::to_range_bearing(
         plane, gstate.sonar_pose, gstate.sonar_params.max_bearing, gstate.sonar_params.max_elevation);
 
     if (false) {
-      for (const auto& pt : plane) {
+      for (const auto &pt : plane) {
         sonder::draw_point(pt, 0.1f);
       }
     }
 
     if (true) {
-      for (const auto& pt : gstate.intersection_estimates) {
+      for (const auto &pt : gstate.intersection_estimates.points) {
         glColor3f(0.0, 0.4, 0.8);
         sonder::draw_point(pt, 0.05f);
       }
@@ -503,7 +493,7 @@ void draw_sonar_data() {
     if ((delta_position > MIN_TRANSLATION) || (delta_orientation > MIN_ROTATION)) {
       gstate.last_capture_pose = gstate.sonar_pose;
 
-      for (const auto& rb : range_bearing) {
+      for (const auto &rb : range_bearing) {
         Eigen::AngleAxisf rotation(rb.y(), Eigen::Vector3f::UnitZ());
 
         const Eigen::Vector3f normal =
@@ -516,24 +506,19 @@ void draw_sonar_data() {
 
         gstate.sections.push_back(circ_sec);
 
-        // --> TODO: Try std::moveing this
-        const EigStdVector<Eigen::Vector3f> intersections = intersect_all_sections(circ_sec, gstate.sections);
-        if (intersections.size() > 0) {
-          for (const auto& pt : intersections) {
-            gstate.intersection_estimates.push_back(pt);
-          }
-        }
+        const sonder::IntersectionVotes intersections = intersect_all_sections(circ_sec, gstate.sections);
+        sonder::add_points(intersections, out(gstate.intersection_estimates));
       }
     }
   }
 
   glColor3f(0.0f, 0.7f, 0.1f);
-  for (const auto& circ_sec : gstate.sections) {
+  for (const auto &circ_sec : gstate.sections) {
     sonder::draw_circular_section(circ_sec);
   }
 
   glColor3f(0.9f, 0.4f, 0.2f);
-  for (const auto& circ_sec : gstate.sections) {
+  for (const auto &circ_sec : gstate.sections) {
     sonder::draw_circle(circ_sec.spanning_circle);
   }
 
@@ -620,7 +605,7 @@ void reshape(int w, int h) {
   glLoadIdentity();
 }
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv) {
   glutInit(&argc, argv);
   glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB);
 
