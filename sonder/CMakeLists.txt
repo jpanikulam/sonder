@@ -10,8 +10,8 @@ find_package(CUDA QUIET REQUIRED)
 #
 find_package(OpenGL REQUIRED)
 find_package(GLUT REQUIRED)
-include_directories( ${OPENGL_INCLUDE_DIR}  ${GLUT_INCLUDE_DIR} )
-message(${OPENGL_INCLUDE_DIR}  ${GLUT_INCLUDE_DIR} )
+include_directories(${OPENGL_INCLUDE_DIR}  ${GLUT_INCLUDE_DIR})
+message(${OPENGL_INCLUDE_DIR} ${GLUT_INCLUDE_DIR})
 
 #########################
 # Eigen
