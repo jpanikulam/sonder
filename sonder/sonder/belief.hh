@@ -32,7 +32,7 @@ struct IntersectionVotes {
     _max_vote = point_votes > _max_vote ? point_votes : _max_vote;
   }
 
-  float max_vote() const {
+  float max_votes() const {
     return static_cast<float>(_max_vote);
   }
 

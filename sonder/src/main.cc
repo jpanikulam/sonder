@@ -480,7 +480,7 @@ void draw_sonar_data() {
     }
 
     if (true) {
-      const float max_vote = gstate.intersection_estimates.max_vote();
+      const float max_vote = gstate.intersection_estimates.max_votes();
       for (std::size_t k = 0; k < gstate.intersection_estimates.points.size(); ++k) {
 
         glColor4f(0.0, 0.4, 0.8, gstate.intersection_estimates.votes[k] / max_vote);
