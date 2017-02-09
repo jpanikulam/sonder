@@ -10,7 +10,7 @@ void draw_coordinate_system() {
   draw_coordinate_system(Eigen::Vector3f::Zero(), Eigen::Matrix3f::Identity());
 }
 
-void draw_coordinate_system(const se3 &pose){
+void draw_coordinate_system(const se3 &pose) {
   // const auto pose_inv = pose.inverse();
   draw_coordinate_system(pose.translation(), pose.rotationMatrix());
 }
@@ -212,9 +212,7 @@ void draw_cube() {
 // This isn't quite correct
 //
 void draw_sonar_view(const se3 &pose, const float max_bearing, const float max_elevation) {
-  glColor3f(0.0f, 1.0f, 0.0f);
-
-  const float range = 7.0f;
+  constexpr float range = 20.0f;
 
   const float x_sym = range * cos(max_bearing);
   const float y_sym = range * sin(max_bearing);
@@ -228,6 +226,8 @@ void draw_sonar_view(const se3 &pose, const float max_bearing, const float max_e
   glPushMatrix();
   glTranslate(pose.translation());
   glRotate(pose.unit_quaternion());
+
+  glColor3f(0.9f, 0.0f, 0.0f);
   glBegin(GL_LINE_STRIP);
   {
     glVertex3f(0.0, 0.0, 0.0);
@@ -242,6 +242,28 @@ void draw_sonar_view(const se3 &pose, const float max_bearing, const float max_e
     glVertex3f(x_sym, -y_sym, -z_sym);
     glVertex3f(x_sym, -y_sym, z_sym);
 
+    glVertex3f(x_sym, y_sym, z_sym);
+    glVertex3f(x_sym, y_sym, -z_sym);
+  }
+  glEnd();
+
+  glColor4f(0.2f, 0.7f, 0.0f, 0.2f);
+  // This does some weird stuff, meh
+  glBegin(GL_TRIANGLES);
+  {
+    glVertex3f(0.0, 0.0, 0.0);
+    glVertex3f(x_sym, y_sym, z_sym);
+    glVertex3f(x_sym, -y_sym, z_sym);
+
+    glVertex3f(0.0, 0.0, 0.0);
+    glVertex3f(x_sym, -y_sym, -z_sym);
+    glVertex3f(x_sym, y_sym, -z_sym);
+
+    glVertex3f(0.0, 0.0, 0.0);
+    glVertex3f(x_sym, -y_sym, -z_sym);
+    glVertex3f(x_sym, -y_sym, z_sym);
+
+    glVertex3f(0.0, 0.0, 0.0);
     glVertex3f(x_sym, y_sym, z_sym);
     glVertex3f(x_sym, y_sym, -z_sym);
   }

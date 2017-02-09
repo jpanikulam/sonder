@@ -18,7 +18,7 @@ class circular_section {
         radius(_radius),
         arc_rads(_arc_rads),
         spanning_circle(_normal, _center, _radius) {
-    _cos_arc_rads = std::cos(_arc_rads);
+    _cos_arc_rads = std::cos(_arc_rads / 2.0);
   }
 
   // Compute the intersection point(s) of two circular arcs

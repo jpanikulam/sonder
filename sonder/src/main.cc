@@ -26,7 +26,7 @@ enum ManipulationMode : int16_t {
 
 struct SonarParams {
   float max_bearing   = 1.1f; // Max bearing for the sonar view
-  float max_elevation = 0.4f; // Max elevation for the sonar view
+  float max_elevation = 0.2f; // Max elevation for the sonar view
 };
 
 struct State {
@@ -480,8 +480,11 @@ void draw_sonar_data() {
     }
 
     if (true) {
-      for (const auto &pt : gstate.intersection_estimates.points) {
-        glColor3f(0.0, 0.4, 0.8);
+      const float max_vote = gstate.intersection_estimates.max_vote();
+      for (std::size_t k = 0; k < gstate.intersection_estimates.points.size(); ++k) {
+
+        glColor4f(0.0, 0.4, 0.8, gstate.intersection_estimates.votes[k] / max_vote);
+        const Eigen::Vector3f &pt = gstate.intersection_estimates.points[k];
         sonder::draw_point(pt, 0.05f);
       }
     }
@@ -517,7 +520,7 @@ void draw_sonar_data() {
     sonder::draw_circular_section(circ_sec);
   }
 
-  glColor3f(0.9f, 0.4f, 0.2f);
+  glColor4f(0.9f, 0.4f, 0.2f, 0.7f);
   for (const auto &circ_sec : gstate.sections) {
     sonder::draw_circle(circ_sec.spanning_circle);
   }
