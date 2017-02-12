@@ -5,7 +5,7 @@
 #include <Eigen/Dense>
 #include <sonder/opengl.hh>
 
-#include <sonder/simulation/rendering.hh>
+#include <sonder/sensing/rendering.hh>
 
 #include <sonder/geometry.hh>
 #include <sonder/geometry/circle.hh>
@@ -266,7 +266,7 @@ void default_init() {
 // Callbacks
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-void keyboard(unsigned char key, int x, int y, bool held) {
+void process_keyboard(unsigned char key, int x, int y, bool held) {
   //
   // Handle single-touch input keys (No special behavior if held down)
   //
@@ -308,10 +308,10 @@ void keyboard(unsigned char key, int x, int y, bool held) {
   glutPostRedisplay();
 }
 void keyboard_down(unsigned char key, int x, int y) {
-  keyboard(key, x, y, true);
+  process_keyboard(key, x, y, true);
 }
 void keyboard_up(unsigned char key, int x, int y) {
-  keyboard(key, x, y, false);
+  process_keyboard(key, x, y, false);
 }
 
 void process_special_keys(const int key, const int x, const int y, bool held) {
@@ -434,28 +434,6 @@ void mouse(const int button, const int state, const int x, const int y) {
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
-// Generic geometry
-/////////////////////////////////////////////////////////////////////////////////////////////////
-
-sonder::IntersectionVotes intersect_all_sections(const sonder::circular_section &             section,
-                                                 const std::vector<sonder::circular_section> &other_sections) {
-  constexpr float MIN_DIST_TO_ADD = 1e-3;
-
-  sonder::IntersectionVotes all_intersections;
-
-  //
-  // Seek an intersection among `other_sections`
-  //
-  for (const auto &other_section : other_sections) {
-    const auto intersections = section.intersect(other_section);
-    for (const auto &pt : intersections) {
-      all_intersections.add_point(pt);
-    }
-  }
-  return all_intersections;
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////////////
 // Display
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -479,16 +457,6 @@ void draw_sonar_data() {
       }
     }
 
-    if (true) {
-      const float max_vote = gstate.intersection_estimates.max_votes();
-      for (std::size_t k = 0; k < gstate.intersection_estimates.points.size(); ++k) {
-
-        glColor4f(0.0, 0.4, 0.8, gstate.intersection_estimates.votes[k] / max_vote);
-        const Eigen::Vector3f &pt = gstate.intersection_estimates.points[k];
-        sonder::draw_point(pt, 0.05f);
-      }
-    }
-
     const float delta_position = (gstate.last_capture_pose.translation() - gstate.sonar_pose.translation()).norm();
     const float delta_orientation =
         (so3::log(gstate.last_capture_pose.so3() * gstate.sonar_pose.so3().inverse())).norm();
@@ -509,7 +477,7 @@ void draw_sonar_data() {
 
         gstate.sections.push_back(circ_sec);
 
-        const sonder::IntersectionVotes intersections = intersect_all_sections(circ_sec, gstate.sections);
+        const sonder::IntersectionVotes intersections = sonder::intersect_all_sections(circ_sec, gstate.sections);
         sonder::add_points(intersections, out(gstate.intersection_estimates));
       }
     }
@@ -520,9 +488,18 @@ void draw_sonar_data() {
     sonder::draw_circular_section(circ_sec);
   }
 
-  glColor4f(0.9f, 0.4f, 0.2f, 0.7f);
+  glColor4f(0.5f, 0.7f, 0.1f, 0.4f);
   for (const auto &circ_sec : gstate.sections) {
     sonder::draw_circle(circ_sec.spanning_circle);
+  }
+  if (true) {
+    const float max_vote = gstate.intersection_estimates.max_votes();
+    for (std::size_t k = 0; k < gstate.intersection_estimates.points.size(); ++k) {
+
+      glColor4f(0.0f, 0.4f, 0.8f, gstate.intersection_estimates.votes[k] / max_vote);
+      const Eigen::Vector3f &pt = gstate.intersection_estimates.points[k];
+      sonder::draw_point(pt, 0.05f);
+    }
   }
 
   //
@@ -630,7 +607,12 @@ int main(int argc, char **argv) {
   //
   // Input
   //
-  glutKeyboardFunc(keyboard_down);
+  // glutKeyboardFunc(keyboard_down);
+  // glutKeyboardUpFunc(keyboard_up);
+  // void process_special_keys(const int key, const int x, const int y, bool held) {
+
+  glutKeyboardFunc(
+      std::bind(process_keyboard, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, true));
   glutKeyboardUpFunc(keyboard_up);
   glutSpecialFunc(special_keys_down);
   glutSpecialUpFunc(special_keys_up);

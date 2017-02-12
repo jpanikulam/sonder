@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Eigen/Dense>
+#include <sonder/geometry/circular_section.hh>
 #include <sonder/types.hh>
 
 #include <vector>
@@ -18,7 +19,8 @@ struct IntersectionVotes {
   }
 
   inline void add_point(const Eigen::Vector3f &point, const std::size_t point_votes = 1) {
-    constexpr float MIN_DIST_TO_ADD = 1e-3;
+    // constexpr float MIN_DIST_TO_ADD = 1e-2;
+    constexpr float MIN_DIST_TO_ADD = 1e-1;
 
     for (std::size_t k = 0; k < points.size(); ++k) {
       if ((point - points[k]).norm() < MIN_DIST_TO_ADD) {
@@ -54,5 +56,25 @@ void add_points(const IntersectionVotes &new_votes, Out<IntersectionVotes> old_v
     const Eigen::Vector3f &pt = new_votes.points[new_index];
     old_votes->add_point(pt, new_votes.votes[new_index]);
   }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////
+// Generic geometry
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+sonder::IntersectionVotes intersect_all_sections(const sonder::circular_section &             section,
+                                                 const std::vector<sonder::circular_section> &other_sections) {
+  sonder::IntersectionVotes all_intersections;
+
+  //
+  // Seek an intersection among `other_sections`
+  //
+  for (const auto &other_section : other_sections) {
+    const auto intersections = section.intersect(other_section);
+    for (const auto &pt : intersections) {
+      all_intersections.add_point(pt);
+    }
+  }
+  return all_intersections;
 }
 }

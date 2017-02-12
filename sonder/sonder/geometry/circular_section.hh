@@ -4,7 +4,7 @@
 namespace sonder {
 
 class circular_section {
- public:
+public:
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 
   circular_section(const Eigen::Vector3f &_direction,
@@ -12,11 +12,7 @@ class circular_section {
                    const Eigen::Vector3f &_center,
                    const float            _radius,
                    const float            _arc_rads)
-      : direction(_direction),
-        normal(_normal),
-        center(_center),
-        radius(_radius),
-        arc_rads(_arc_rads),
+      : direction(_direction), normal(_normal), center(_center), radius(_radius), arc_rads(_arc_rads),
         spanning_circle(_normal, _center, _radius) {
     _cos_arc_rads = std::cos(_arc_rads / 2.0);
   }
@@ -56,11 +52,11 @@ class circular_section {
   //
   bool is_point_on_circle_on_arc(const Eigen::Vector3f &pt) const {
     const auto  difference = (pt - center).normalized();
-    const float dot        = std::fabs(difference.dot(direction));
+    const float dot        = difference.dot(direction);
     return (dot >= _cos_arc_rads);
   }
 
- private:
+private:
   float _cos_arc_rads;
 };
 }

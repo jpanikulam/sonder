@@ -46,6 +46,6 @@ add_executable(sonar_viz
     src/geometry.cc
     src/opengl.cc
 
-    src/simulation/rendering.cc
+    src/sensing/rendering.cc
     )
 target_link_libraries(sonar_viz ${OPENGL_LIBRARIES} ${GLUT_LIBRARY} ${CMAKE_THREAD_LIBS_INIT})
