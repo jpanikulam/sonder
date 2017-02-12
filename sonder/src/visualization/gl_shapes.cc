@@ -12,7 +12,6 @@ void draw_coordinate_system() {
 }
 
 void draw_coordinate_system(const se3 &pose) {
-  // const auto pose_inv = pose.inverse();
   draw_coordinate_system(pose.translation(), pose.rotationMatrix());
 }
 
@@ -84,7 +83,7 @@ void draw_point(const Eigen::Vector3f &point, const float radius) {
   glPopMatrix();
 }
 
-void draw_circle(const Eigen::Vector3f &center, const Eigen::Vector3f &normal, const float radius) {
+void draw_circle(const Eigen::Vector3f &normal, const Eigen::Vector3f &center, const float radius) {
   constexpr int num_vertices = 100;
 
   //
@@ -101,25 +100,23 @@ void draw_circle(const Eigen::Vector3f &center, const Eigen::Vector3f &normal, c
   //
 
   // A rotation between the Z axis and the circle normal
-  Eigen::Matrix3f rotation = create_rotation_to(Eigen::Vector3f::UnitZ(), normal);
+  Eigen::Quaternionf rotation = create_rotation_to(Eigen::Vector3f::UnitZ(), normal);
 
-  // Apply the transformation
-  Eigen::Array<float, 3, num_vertices> vertices;
-  vertices.matrix() = rotation * xy_plane_vertices.matrix();
+  const se3 transform(rotation, center);
 
   // Draw the lines (dotted)
   // ((IF SOLID: GL_LINE_STRIP))
   glBegin(GL_LINES);
   {
     for (int k = 0; k < num_vertices; ++k) {
-      glVertex(vertices.col(k).matrix() + center);
+      glVertex(transform * xy_plane_vertices.col(k));
     }
   }
   glEnd();
 }
 
 void draw_circle(const circle &ge_circle) {
-  draw_circle(ge_circle.center, ge_circle.normal, ge_circle.radius);
+  draw_circle(ge_circle.normal, ge_circle.center, ge_circle.radius);
 }
 
 void draw_circular_section(const circular_section &section) {

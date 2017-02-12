@@ -30,7 +30,7 @@ void draw_point2d(const Eigen::Vector2f &point, const float radius = 1.0);
 // @param radius The radius of the circle
 //
 // (Solid circle is a one-line change, this just looks cooler)
-void draw_circle(const Eigen::Vector3f &center, const Eigen::Vector3f &normal, const float radius);
+void draw_circle(const Eigen::Vector3f &normal, const Eigen::Vector3f &center, const float radius);
 
 void draw_circle(const circle &ge_circle);
 

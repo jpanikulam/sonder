@@ -11,7 +11,7 @@ Eigen::AngleAxisf vector3f_to_angleaxis(const Eigen::Vector3f &vec);
 // Construct a rotation between two vectors (Non-unique)
 //
 //
-Eigen::Matrix3f create_rotation_to(const Eigen::Vector3f &from, const Eigen::Vector3f &to);
+Eigen::Quaternionf create_rotation_to(const Eigen::Vector3f &from, const Eigen::Vector3f &to);
 
 // Construct a rotation into a frame defined by two vectors
 //

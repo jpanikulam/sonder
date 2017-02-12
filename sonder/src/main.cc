@@ -620,9 +620,9 @@ int main(int argc, char **argv) {
   //
   // View Initialization
   //
-  Eigen::Matrix3f view_orientation;
-  view_orientation << 0.978117, 0.207935, -0.00695645, 0.006618, 0.00232671, 0.999976, 0.207946, -0.978139, 0.000898672;
-  Eigen::Vector3f view_position(-1.40469, 6.51158, -0.350347);
+  const Eigen::Matrix3f view_orientation = (Eigen::Matrix3f() << 0.978117, 0.207935, -0.00695645, 0.006618, 0.00232671,
+                          0.999976, 0.207946, -0.978139, 0.000898672).finished();
+  const Eigen::Vector3f view_position(-1.40469, 6.51158, -0.350347);
 
   gstate.view_pose = se3(view_orientation, view_position);
 
