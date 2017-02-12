@@ -29,7 +29,7 @@ find_package(Threads)
 #
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 set(BASEPATH "${CMAKE_CURRENT_SOURCE_DIR}")
-include_directories("${BASEPATH}")
+include_directories("${BASEPATH}/src")
 include_directories("${BASEPATH}/third_party/Sophus")
 
 #########################
@@ -41,10 +41,9 @@ set(CMAKE_CXX_FLAGS "--std=c++11 -O2 -Wall -Wno-unused-variable -Wno-unused-func
 # Create sonar_viz
 add_executable(sonar_viz
     src/main.cc
-    src/geometry.cc
-    src/gl_shapes.cc
-    src/geometry.cc
-    src/opengl.cc
+    src/geometry/geometry.cc
+    src/visualization/gl_shapes.cc
+    src/visualization/opengl.cc
 
     src/sensing/rendering.cc
     )

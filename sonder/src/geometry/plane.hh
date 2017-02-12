@@ -1,7 +1,7 @@
 #pragma once
 
-#include <sonder/geometry.hh>
-#include <sonder/geometry/line.hh>
+#include "geometry/geometry.hh"
+#include "geometry/line.hh"
 
 namespace sonder {
 

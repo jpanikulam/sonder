@@ -1,6 +1,7 @@
-#include <sonder/geometry.hh>
-#include <sonder/gl_shapes.hh>
-#include <sonder/opengl.hh>
+#include "visualization/gl_shapes.hh"
+#include "visualization/opengl.hh"
+
+#include "geometry/geometry.hh"
 
 #include <Eigen/Dense>
 

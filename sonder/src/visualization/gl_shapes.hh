@@ -1,9 +1,9 @@
 #pragma once
 
-#include <sonder/geometry/circle.hh>
-#include <sonder/geometry/circular_section.hh>
-#include <sonder/geometry/line.hh>
-#include <sonder/geometry/plane.hh>
+#include "geometry/circle.hh"
+#include "geometry/circular_section.hh"
+#include "geometry/line.hh"
+#include "geometry/plane.hh"
 
 #include <Eigen/Dense>
 

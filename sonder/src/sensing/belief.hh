@@ -1,8 +1,8 @@
 #pragma once
 
 #include <Eigen/Dense>
-#include <sonder/geometry/circular_section.hh>
-#include <sonder/types.hh>
+#include "geometry/circular_section.hh"
+#include "types.hh"
 
 #include <vector>
 

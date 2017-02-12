@@ -1,4 +1,4 @@
-#include <sonder/opengl.hh>
+#include "visualization/opengl.hh"
 
 #if defined(__unix__)
 

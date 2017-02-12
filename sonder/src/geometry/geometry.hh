@@ -1,7 +1,8 @@
 #pragma once
 
+#include "types.hh"
+
 #include <Eigen/Dense>
-#include <sonder/types.hh>
 
 namespace sonder {
 

@@ -1,8 +1,8 @@
 #pragma once
 
-#include <sonder/geometry.hh>
-#include <sonder/geometry/plane.hh>
-#include <sonder/math.hh>
+#include "geometry/geometry.hh"
+#include "geometry/plane.hh"
+#include "math/math.hh"
 
 namespace sonder {
 

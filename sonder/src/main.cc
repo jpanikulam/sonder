@@ -1,21 +1,20 @@
 #include <iostream>
 #include <map>
-#include <math.h> // Math library (Higher math functions )
+#include <math.h>
 
+#include "visualization/opengl.hh"
 #include <Eigen/Dense>
-#include <sonder/opengl.hh>
 
-#include <sonder/sensing/rendering.hh>
+#include "sensing/belief.hh"
+#include "sensing/rendering.hh"
 
-#include <sonder/geometry.hh>
-#include <sonder/geometry/circle.hh>
-#include <sonder/geometry/line.hh>
-#include <sonder/geometry/plane.hh>
+#include "geometry/geometry.hh"
+#include "geometry/circle.hh"
+#include "geometry/line.hh"
+#include "geometry/plane.hh"
 
-#include <sonder/belief.hh>
-
-#include <sonder/gl_shapes.hh>
-#include <sonder/types.hh>
+#include "types.hh"
+#include "visualization/gl_shapes.hh"
 
 #include <sophus/se3.hpp>
 
@@ -607,12 +606,9 @@ int main(int argc, char **argv) {
   //
   // Input
   //
-  // glutKeyboardFunc(keyboard_down);
-  // glutKeyboardUpFunc(keyboard_up);
-  // void process_special_keys(const int key, const int x, const int y, bool held) {
+  glutKeyboardFunc(keyboard_down);
+  glutKeyboardUpFunc(keyboard_up);
 
-  glutKeyboardFunc(
-      std::bind(process_keyboard, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, true));
   glutKeyboardUpFunc(keyboard_up);
   glutSpecialFunc(special_keys_down);
   glutSpecialUpFunc(special_keys_up);
