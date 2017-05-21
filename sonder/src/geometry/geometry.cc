@@ -1,4 +1,5 @@
 #include "geometry/geometry.hh"
+#include <sophus/se3.hpp>
 
 namespace sonder {
 
@@ -18,10 +19,11 @@ Eigen::Quaternionf create_rotation_to(const Eigen::Vector3f &from, const Eigen::
   // Enforce normalization when computing the axis
   const Eigen::Vector3f u_from = from.normalized();
   const Eigen::Vector3f u_to   = to.normalized();
-  const Eigen::Vector3f u_axis = u_from.cross(u_to);
+  // Might be more pipeline friendly if this doesn't use u_*, since it does its own normalization
+  const Eigen::Vector3f u_axis = u_from.cross(u_to).normalized();
   const float           angle  = std::acos(u_from.dot(u_to));
 
-  const Eigen::AngleAxisf angle_axis(angle, u_axis);
+  const Eigen::AngleAxisf  angle_axis(angle, u_axis);
   const Eigen::Quaternionf q_rotation(angle_axis);
   return q_rotation;
 }

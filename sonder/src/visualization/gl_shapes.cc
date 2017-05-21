@@ -84,15 +84,17 @@ void draw_point(const Eigen::Vector3f &point, const float radius) {
 }
 
 void draw_circle(const Eigen::Vector3f &normal, const Eigen::Vector3f &center, const float radius) {
-  constexpr int num_vertices = 100;
+  constexpr int   num_vertices   = 100;
+  constexpr float scaling_factor = 2.0f * M_PI / num_vertices;
 
   //
   // Build the circle in 2D on the x-y plane
   //
   Eigen::Array<float, 3, num_vertices> xy_plane_vertices;
+
   for (int k = 0; k < num_vertices; ++k) {
-    const float t            = 2 * M_PI * ((float)k / num_vertices);
-    xy_plane_vertices.col(k) = Eigen::Vector3f(radius * std::sin(t), radius * std::cos(t), 0.0);
+    const float t            = scaling_factor * static_cast<float>(k);
+    xy_plane_vertices.col(k) = Eigen::Vector3f(radius * std::cos(t), radius * std::sin(t), 0.0f);
   }
 
   //
@@ -100,7 +102,7 @@ void draw_circle(const Eigen::Vector3f &normal, const Eigen::Vector3f &center, c
   //
 
   // A rotation between the Z axis and the circle normal
-  Eigen::Quaternionf rotation = create_rotation_to(Eigen::Vector3f::UnitZ(), normal);
+  const Eigen::Quaternionf rotation = create_rotation_to(Eigen::Vector3f::UnitZ(), normal);
 
   const se3 transform(rotation, center);
 
@@ -136,8 +138,8 @@ void draw_circular_section(const circular_section &section) {
   //
   // Transform the x-z plane circle to the normal plane
   //
-  Eigen::Quaternionf rotation = rotation_from_xy(section.direction, section.normal);
-  const se3          transform(rotation, section.center);
+  const Eigen::Quaternionf rotation = rotation_from_xy(section.direction, section.normal);
+  const se3                transform(rotation, section.center);
 
   // Draw the lines (dotted)
   // ((IF SOLID: GL_LINE_STRIP))
@@ -148,15 +150,21 @@ void draw_circular_section(const circular_section &section) {
     }
   }
   glEnd();
+  // glBegin(GL_LINES);
+  //{
+  //  glVertex(section.center);
+  //  glVertex(section.center + (section.direction * section.radius));
+  //}
+  // glEnd();
 }
 
 void draw_line(const line &ge_line) {
-  const Eigen::Vector3f scaled_direction = 10.0 * ge_line.direction;
+  const Eigen::Vector3f scaled_direction = 10.0f * ge_line.direction;
   draw_line(ge_line.point + scaled_direction, ge_line.point - scaled_direction);
 }
 
 void draw_plane(const plane &ge_plane) {
-  constexpr float       scale   = 5.0;
+  constexpr float       scale   = 5.0f;
   const Eigen::Vector3f x_basis = any_perpendicular(ge_plane.normal).normalized();
   const Eigen::Vector3f y_basis = x_basis.cross(ge_plane.normal).normalized();
 

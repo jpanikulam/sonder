@@ -39,6 +39,9 @@ public:
     return intersections;
   }
 
+  //
+  // Const members, initialized to nonsense
+  //
   const Eigen::Vector3f direction = Eigen::Vector3f::Zero();
   const Eigen::Vector3f normal    = Eigen::Vector3f::Zero();
   const Eigen::Vector3f center    = Eigen::Vector3f::Zero();

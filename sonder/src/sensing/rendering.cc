@@ -41,12 +41,12 @@ EigStdVector<Eigen::Vector3f> make_plane_blanket() {
   EigStdVector<Eigen::Vector3f> points;
 
   for (float x = 1.0; x < 3.0; x += 1.0) {
-    for (float y = -1.0; y <= 1.0; y += 1.0) {
-      for (float z = 0.0; z <= 1.0; z += 1.0) {
-        const Eigen::Vector3f pt = Eigen::Vector3f(x, y, z) + (Eigen::Vector3f::Random() * 0.001);
-        points.emplace_back(pt);
-      }
-    }
+   for (float y = -1.0; y <= 1.0; y += 1.0) {
+     for (float z = 0.0; z <= 1.0; z += 1.0) {
+       const Eigen::Vector3f pt = Eigen::Vector3f(x, y, z) + (Eigen::Vector3f::Random() * 0.001);
+       points.emplace_back(pt);
+     }
+   }
   }
   // points.emplace_back(1.0, 0.0, 0.0);
 
